@@ -1,0 +1,5 @@
+packages:
+  - packages/*
+
+overrides:
+  gy-vue-theme: 'link:'

@@ -89,11 +89,19 @@ function mergeThemeConfig(parent: ThemeConfig, child: ThemeConfig): ThemeConfig 
       }
     : undefined;
 
+  const mergedSemanticToken = (parent.semanticToken !== undefined || child.semanticToken !== undefined)
+    ? {
+        ...(parent.semanticToken ?? {}),
+        ...(child.semanticToken ?? {}),
+      }
+    : undefined;
+
   return {
     theme: child.theme ?? parent.theme,
     mode: child.mode ?? parent.mode,
     compact: child.compact ?? parent.compact,
     seedToken: mergedSeedToken,
+    semanticToken: mergedSemanticToken,
     componentToken: mergeComponentToken(parent.componentToken, child.componentToken),
     cssVar: child.cssVar !== undefined ? child.cssVar : parent.cssVar,
   };

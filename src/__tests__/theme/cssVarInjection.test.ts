@@ -344,4 +344,55 @@ describe('ThemeProvider bridge prop', () => {
 
     wrapper.unmount();
   });
+
+  it('嵌套 ThemeProvider 应合并 semanticToken 覆盖', async () => {
+    let injectedToken: Record<string, unknown> | null = null;
+
+    const CaptureToken = defineComponent({
+      name: 'CaptureToken',
+      setup() {
+        const token = useThemeToken();
+        injectedToken = token.value as unknown as Record<string, unknown>;
+        return () => h('div', { class: 'capture-token' });
+      },
+    });
+
+    const NestedProviders = defineComponent({
+      name: 'NestedProviders',
+      setup() {
+        return () => h(
+          ThemeProvider,
+          {
+            config: {
+              semanticToken: { colorText: '#111111' },
+            } as ThemeConfig,
+          },
+          {
+            default: () => h(
+              ThemeProvider,
+              {
+                config: {
+                  semanticToken: { colorBgContainer: '#222222' },
+                } as ThemeConfig,
+              },
+              {
+                default: () => h(CaptureToken),
+              },
+            ),
+          },
+        );
+      },
+    });
+
+    const wrapper = mount(NestedProviders);
+
+    await nextTick();
+
+    expect(injectedToken).toBeTruthy();
+    const capturedToken = injectedToken as unknown as Record<string, unknown>;
+    expect(capturedToken.colorText).toBe('#111111');
+    expect(capturedToken.colorBgContainer).toBe('#222222');
+
+    wrapper.unmount();
+  });
 });

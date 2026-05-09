@@ -50,7 +50,7 @@ import { ThemeProvider, defineTheme } from 'gy-vue-theme'
 
 const myTheme = defineTheme({
   name: 'my-theme',
-  token: { colorPrimary: '#1890FF' },
+  seedToken: { common: { colorPrimary: '#1890FF' } },
 })
 </script>
 

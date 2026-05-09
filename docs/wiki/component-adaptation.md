@@ -39,7 +39,7 @@ SemanticToken.colorSuccess  → StatusTag.successBg
 定义组件令牌后，应用开发者可以：
 - 通过 `useComponentToken('ElButton')` 在 JS 中获取类型安全的设计值
 - 在自定义 CSS 中引用这些值
-- 通过 `ThemeConfig.components` 在运行时覆盖特定组件的令牌
+- 通过 `ThemeConfig.componentToken` 在运行时覆盖特定组件的令牌
 
 ### CSS 变量桥接
 
@@ -59,7 +59,7 @@ ElInput.fontSize         → --el-font-size-base
 
 ### 第一步：定义组件令牌文件
 
-**在组件令牌定义文件中**完成三件事：定义 TypeScript 接口、通过声明合并扩展 `ComponentTokenMap`、创建 `defineComponentToken` 实例。无需单独的 `types.ts`，类型即是令牌定义的一部分：
+**在组件令牌定义文件中**完成三件事：定义 TypeScript 接口、通过声明合并扩展 `ComponentTokenMap`、创建 `defineComponentToken` 实例。类型既可以和令牌定义放在同一个文件，也可以像当前仓库的 Element Plus 适配器一样拆到独立的 `types.ts`：
 
 ```typescript
 // src/tokens/button.ts
@@ -229,26 +229,34 @@ useCSSVarsBridge('ElButton', mapButtonVars, { selector: '.el-button' })
 > 选择器模式会自动添加 `html` 前缀（如 `html .el-button { ... }`）以确保优先级高于组件自身的定义。
 
 这样做的好处：
-- 应用开发者通过 `ThemeConfig.components.ElButton` 覆盖的值会**自动反映到 CSS 变量中**
+- 应用开发者通过 `ThemeConfig.componentToken.ElButton` 覆盖的值会**自动反映到 CSS 变量中**
 - 组件令牌成为唯一的组件级设计值来源，无论是 JS 消费还是 CSS 变量注入
 
-### 第四步：创建桥接入口（bridges/index.ts）
+### 第四步：创建桥接入口（bridge.ts）
 
-`bridges/index.ts` 负责两件事：导出所有映射函数，以及提供调用 `useCSSVarsBridge` 的便捷组合函数。`useCSSVarsBridge` 的调用**只在这里出现**，不出现在各独立的 bridge 文件中：
+当前仓库的 Element Plus 适配器将映射函数与便捷组合函数都放在 `bridge.ts` 中。`useCSSVarsBridge` 的调用集中在这里，避免散落在各处：
 
 ```typescript
-// src/bridges/index.ts
-import { useCSSVarsBridge, defineComponent } from 'gy-vue-theme'
+// src/bridge.ts
+import { defineComponent } from 'vue'
+import { useCSSVarsBridge } from 'gy-vue-theme'
 import type { CSSVarsBridgeOptions } from 'gy-vue-theme'
-import { mapButtonVars } from './button'
-import { mapInputVars } from './input'
+import { mapGlobalTokenToElementVars, mapButtonVars, mapInputVars } from './bridge'
 
 /**
- * 一键桥接 Element Plus 全局 + 所有组件级 CSS 变量
+ * 一键桥接 Element Plus 全局 CSS 变量
  *
  * 在 ThemeProvider 内部的 Vue setup 中调用即可。
  */
 export function useElementPlusCSSVars(options: CSSVarsBridgeOptions = {}): void {
+  useCSSVarsBridge('ElGlobal', mapGlobalTokenToElementVars, options)
+}
+
+/**
+ * 一键桥接 Element Plus 全局 + 所有组件级 CSS 变量
+ */
+export function useAllElementPlusCSSVars(options: CSSVarsBridgeOptions = {}): void {
+  useElementPlusCSSVars(options)
   useCSSVarsBridge('ElButton', mapButtonVars, { ...options, selector: '.el-button' })
   useCSSVarsBridge('ElInput', mapInputVars, { ...options, selector: '.el-input' })
   // ... 其他组件
@@ -272,6 +280,7 @@ export const ElementPlusThemeBridge = defineComponent({
 // src/index.ts
 import { registerComponentToken } from 'gy-vue-theme'
 import { allComponentTokens } from './tokens'
+import './types'
 
 /**
  * 注册所有组件令牌并初始化适配器
@@ -280,14 +289,14 @@ export function setupElementPlusAdapter(): void {
   registerComponentToken(...allComponentTokens)
 }
 
-// 组件令牌类型与实例（从 tokens/ 统一导出，无需单独的 types.ts）
-export type { ElButtonToken, ElInputToken } from './tokens'
+// 组件令牌类型
+export type { ElButtonToken, ElInputToken } from './types'
 
 // CSS 变量桥接（可选，仅 CSS Var 驱动的框架需要）
-export { useElementPlusCSSVars, ElementPlusThemeBridge } from './bridges'
+export { useElementPlusCSSVars, useAllElementPlusCSSVars, ElementPlusThemeBridge } from './bridge'
 
 // 样式增强（可选）
-export { cardAccentBorder, buttonElevation, getAllEnhancer } from './enhancers'
+export { cardAccentBorder, buttonElevation, createElementPlusEnhancers, createEnhancer } from './enhancers'
 ```
 
 应用端的使用方式：
@@ -295,7 +304,7 @@ export { cardAccentBorder, buttonElevation, getAllEnhancer } from './enhancers'
 ```vue
 <script setup lang="ts">
 import { ThemeProvider } from 'gy-vue-theme'
-import { setupElementPlusAdapter, useElementPlusCSSVars } from 'my-element-plus-adapter'
+import { setupElementPlusAdapter, useAllElementPlusCSSVars } from 'my-element-plus-adapter'
 
 // 应用启动时注册组件令牌
 setupElementPlusAdapter()
@@ -303,11 +312,11 @@ setupElementPlusAdapter()
 
 <template>
   <!-- 方式 1（推荐）：通过 bridge prop 自动桥接，可选 enhancers 深度定制 -->
-  <ThemeProvider :config="themeConfig" :bridge="useElementPlusCSSVars" :enhancers="[cardAccentBorder, buttonElevation]">
+  <ThemeProvider :config="themeConfig" :bridge="useAllElementPlusCSSVars" :enhancers="[cardAccentBorder, buttonElevation]">
     <App />
   </ThemeProvider>
 
-  <!-- 方式 2：使用适配器导出的桥接组件 -->
+  <!-- 方式 2：仅桥接全局变量时，使用适配器导出的桥接组件 -->
   <!-- <ThemeProvider :config="themeConfig">
     <ElementPlusThemeBridge />
     <App />
@@ -356,7 +365,7 @@ const token = useComponentToken('AppCard')
 ```typescript
 const themeConfig: ThemeConfig = {
   theme: myTheme,
-  components: {
+  componentToken: {
     ElButton: { fontWeight: 600 },
     AppCard: { borderRadius: 12 },
   },
@@ -371,36 +380,29 @@ const themeConfig: ThemeConfig = {
 my-adapter/
 ├── src/
 │   ├── index.ts              # 入口：setupXxxAdapter + 统一导出
-│   ├── tokens/
-│   │   ├── index.ts          # 汇总：所有 re-export 类型、实例和 allComponentTokens
-│   │   ├── button.ts         # interface + declare module + defineComponentToken
-│   │   ├── input.ts
-│   │   └── ...
-│   ├── bridges/              # 可选，仅 CSS Var 驱动的框架需要
-│   │   ├── index.ts          # 汇总：所有 re-export 映射函数 + useXxxCSSVars 便捷函数
-│   │   ├── button.ts         # 纯 CSSVarsMapping<ElButtonToken>
-│   │   ├── input.ts
-│   │   └── ...
-│   └── enhancers/            # 可选，深度样式定制
-│       └── ...
+│   ├── types.ts              # ComponentTokenMap 声明合并与类型定义
+│   ├── tokens.ts             # defineComponentToken 实例与 allComponentTokens
+│   ├── bridge.ts             # CSSVarsMapping + useXxxCSSVars 便捷函数
+│   ├── enhancers.ts          # StyleEnhancer 预置与工具函数
+│   └── utils.ts              # 颜色/格式辅助函数
 ├── package.json
 └── tsconfig.json
 ```
 
 **关键设计原则：**
-- 每个组件的 interface、`declare module` 扩展和 `defineComponentToken` **同处一个 token 文件**，不存在单独的 `types.ts`
-- 类型从 `tokens/` 导出，bridge 文件直接从对应 token 文件 import 类型
-- bridge 文件只含纯 `CSSVarsMapping<T>` 函数；`useCSSVarsBridge` 调用集中在 `bridges/index.ts` 的便捷函数中
-- `bridges/` 整个目录都是可选的
+- 类型既可以和 `defineComponentToken` 放在同一个文件，也可以独立到 `types.ts`；当前仓库采用后者
+- bridge 可以按组件拆目录，也可以像当前仓库一样集中在单个 `bridge.ts`
+- `useCSSVarsBridge` 的调用应集中在桥接入口，避免散落到业务代码
+- CSS Var 桥接整体是可选能力；不需要时只保留组件令牌即可
 
 ## 适配其他 UI 框架
 
 无论适配什么框架，流程都是一致的：
 
-1. **定义组件令牌文件**：在每个 token 文件中同时完成接口声明、`declare module` 扩展和 `defineComponentToken` 实例创建
-2. **汇总令牌**：在 `tokens/index.ts` 中统一 re-export 所有类型和实例
-3. **编写映射函数**（如需要）：每个 bridge 文件中只写纯 `CSSVarsMapping<T>`，类型从 token 文件 import
-4. **创建便捷函数**（如需要）：在 `bridges/index.ts` 中调用 `useCSSVarsBridge` 组合成 `useXxxCSSVars`
+1. **定义组件令牌**：可以按组件拆分文件，也可以像当前仓库一样集中到 `types.ts` + `tokens.ts`
+2. **汇总注册入口**：在 `index.ts` 中调用 `registerComponentToken(...allComponentTokens)` 并统一导出公共 API
+3. **编写映射函数**（如需要）：在 `bridge.ts` 或拆分的 bridge 文件中编写纯 `CSSVarsMapping<T>`
+4. **创建便捷函数**（如需要）：集中调用 `useCSSVarsBridge` 组合成 `useXxxCSSVars`
 5. **样式增强**（可选）：定义 `StyleEnhancer` 注入任意 CSS 规则
 
 对于 CSS 变量驱动的框架（如 Naive UI），关键是找到框架的 CSS 变量命名规则（如 `--n-*`），编写组件令牌到这些变量的映射函数。`watchEffect`、DOM 注入/清除等运行时逻辑全部由核心库的 `useCSSVarsBridge()` 处理。
@@ -492,12 +494,12 @@ export const cardAccentBorder: StyleEnhancer = (token) => `
 `
 
 // 工具函数：快速创建增强
-export function getAllEnhancer(selector: string, styles: (token: Parameters<StyleEnhancer>[0]) => string): StyleEnhancer {
+export function createEnhancer(selector: string, styles: (token: Parameters<StyleEnhancer>[0]) => string): StyleEnhancer {
   return (token) => `html ${selector} {\n  ${styles(token)}\n}`
 }
 
 // 推荐增强集合
-export function createMyAdapterEnhancers(): StyleEnhancer[] {
+export function createElementPlusEnhancers(): StyleEnhancer[] {
   return [cardAccentBorder, /* ... */]
 }
 ```

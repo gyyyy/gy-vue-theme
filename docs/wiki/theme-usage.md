@@ -88,13 +88,17 @@ interface ThemeConfig {
   compact?: boolean
 
   /** 种子令牌覆盖（运行时级别） */
-  token?: Partial<SeedToken>
+  seedToken?: {
+    common: Partial<SeedToken>
+    light?: Partial<SeedToken>
+    dark?: Partial<SeedToken>
+  }
 
   /** 语义令牌覆盖（最高优先级） */
   semanticToken?: Partial<SemanticToken>
 
   /** 组件令牌覆盖 */
-  components?: { [K in keyof ComponentTokenMap]?: Partial<ComponentTokenMap[K]> & { algorithm?: boolean } }
+  componentToken?: { [K in keyof ComponentTokenMap]?: Partial<ComponentTokenMap[K]> & { algorithm?: boolean } }
 
   /** CSS 变量配置 */
   cssVar?: false | { prefix?: string; selector?: string }
@@ -279,8 +283,10 @@ const themeConfig: ThemeConfig = {
   mode: 'light',
 
   // 覆盖种子令牌（影响整个色板派生）
-  token: {
-    colorPrimary: '#722ED1',  // 覆盖主色
+  seedToken: {
+    common: {
+      colorPrimary: '#722ED1',  // 覆盖主色
+    },
   },
 
   // 覆盖语义令牌（最高优先级，不经过算法）
@@ -289,7 +295,7 @@ const themeConfig: ThemeConfig = {
   },
 
   // 覆盖组件令牌
-  components: {
+  componentToken: {
     ElButton: {
       fontWeight: 600,
     },
@@ -300,7 +306,7 @@ const themeConfig: ThemeConfig = {
 覆盖优先级（从低到高）：
 
 ```
-默认种子令牌 → 主题 token → ThemeConfig.token
+默认种子令牌 → 主题 seedToken → ThemeConfig.seedToken
                     ↓ 算法派生
    算法语义值 → common → light/dark → ThemeConfig.semanticToken
 ```

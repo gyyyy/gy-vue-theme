@@ -8,7 +8,7 @@
 
 你需要做的核心工作：
 
-1. 确定**种子令牌**：品牌色、字体等共用字段放 `token.seed`，按亮/暗色模式区分的字段则可放 `token.light`/`token.dark`
+1. 确定**种子令牌**：品牌色、字体等共用字段放 `seedToken.common`，按亮/暗色模式区分的字段则可放 `seedToken.light` / `seedToken.dark`
 2. 如有需要，通过 `semanticToken` 对算法派生结果做**精确覆盖**
 3. 通过 `defineTheme()` 导出一个冻结的 `ThemeDefinition` 对象
 
@@ -43,7 +43,7 @@ import { defineTheme } from 'gy-vue-theme'
 
 export const greenTheme = defineTheme({
   name: 'green',
-  token: { colorPrimary: '#00B96B' },
+  seedToken: { common: { colorPrimary: '#00B96B' } },
 })
 ```
 
@@ -121,8 +121,8 @@ export const myTheme: Readonly<ThemeDefinition> = defineTheme({
   name: 'my-theme',
   defaultMode: 'light',
   baseStyles: [staticBase, tokenBase],
-  token: {
-    seed: seedTokenOverrides,
+  seedToken: {
+    common: seedTokenOverrides,
     light: lightSeedOverrides,
     dark: darkSeedOverrides,
   },
@@ -165,8 +165,8 @@ interface ThemeDefinition {
    * - light：仅亮色模式生效，可选
    * - dark：仅暗色模式生效，可选
    */
-  token?: {
-    seed: Partial<SeedToken>
+  seedToken?: {
+    common: Partial<SeedToken>
     light?: Partial<SeedToken>
     dark?: Partial<SeedToken>
   }
@@ -259,15 +259,15 @@ defineTheme({
 > - `baseStyles`：全局 reset、字体渲染优化、滚动条默认外观等，这些样式与令牌弱相关或无关，且应该被组件样式轻易覆盖。
 > - `enhancers`（样式增强器）：对具体 UI 组件的细粒度调整，注入优先级最高，用于"最后一层"定制。
 
-#### `token`
+#### `seedToken`
 
 种子令牌覆盖对象，包含三个子字段：
 
-- **`token.seed`**（必填）：两种模式共用的种子令牌。这是推动整个色板生成的核心。适合放在这里的字段：**与模式无关的品牌色、字体、尺寸、圆角**等。
-- **`token.light`**（可选）：仅亮色模式生效，合并优先级高于 `seed`。
-- **`token.dark`**（可选）：仅暗色模式生效，合并优先级高于 `seed`。
+- **`seedToken.common`**（必填）：两种模式共用的种子令牌。这是推动整个色板生成的核心。适合放在这里的字段：**与模式无关的品牌色、字体、尺寸、圆角**等。
+- **`seedToken.light`**（可选）：仅亮色模式生效，合并优先级高于 `common`。
+- **`seedToken.dark`**（可选）：仅暗色模式生效，合并优先级高于 `common`。
 
-以下字段**强烈建议**放在 `token.light` / `token.dark` 而非 `token.seed` 中，因为它们的合理值在亮/暗模式下完全相反：
+以下字段**强烈建议**放在 `seedToken.light` / `seedToken.dark` 而非 `seedToken.common` 中，因为它们的合理值在亮/暗模式下完全相反：
 
 | 字段 | 亮色推荐值 | 暗色推荐值 | 原因 |
 |------|-----------|-----------|------|
@@ -279,10 +279,10 @@ defineTheme({
 
 ```
 defaultSeedToken
-  → theme.token.seed（共享）
-    → theme.token.light / theme.token.dark（按当前模式）
-      → config.token.seed（运行时共享）
-        → config.token.light / config.token.dark（运行时模式专属）
+  → theme.seedToken.common（共享）
+    → theme.seedToken.light / theme.seedToken.dark（按当前模式）
+      → config.seedToken.common（运行时共享）
+        → config.seedToken.light / config.seedToken.dark（运行时模式专属）
 ```
 
 #### `algorithm`
@@ -313,9 +313,9 @@ defaultSeedToken
 | 功能色 | `colorWarning` | 警告 | `#FAAD14` | |
 | 功能色 | `colorError` | 错误 | `#FF4D4F` | |
 | 功能色 | `colorInfo` | 信息 | `#1677FF` | |
-| 中性色 | `colorBgBase` | 背景基色 | 空（算法自动派生） | **推荐放 `token.light`/`token.dark`** |
-| 中性色 | `colorTextBase` | 文本基色 | 空（算法自动派生） | **推荐放 `token.light`/`token.dark`** |
-| 中性色 | `colorLinkBase` | 链接基色 | 空（回落到 colorInfo） | **推荐放 `token.light`/`token.dark`** |
+| 中性色 | `colorBgBase` | 背景基色 | 空（算法自动派生） | **推荐放 `seedToken.light` / `seedToken.dark`** |
+| 中性色 | `colorTextBase` | 文本基色 | 空（算法自动派生） | **推荐放 `seedToken.light` / `seedToken.dark`** |
+| 中性色 | `colorLinkBase` | 链接基色 | 空（回落到 colorInfo） | **推荐放 `seedToken.light` / `seedToken.dark`** |
 | 字体 | `fontFamily` | 字体族 | 系统字体栈 |
 | 字体 | `fontFamilyCode` | 等宽字体族 | 代码字体栈 |
 | 字体 | `fontSize` | 基础字号(px) | `14` |
@@ -367,8 +367,8 @@ theme-my-brand/
 
 ## 开发建议
 
-1. **先从 `token.seed` 开始**：大多数风格差异只需调整品牌色和几个功能色即可。算法会自动生成完整的色板梯度。
-2. **用 `token.light`/`token.dark` 分离模式相关的种子令牌**：`colorBgBase`、`colorTextBase`、`colorLink` 在亮/暗模式下语义相反，放在共享 `token.seed` 里会让两个算法拿到错误的基准值。
+1. **先从 `seedToken.common` 开始**：大多数风格差异只需调整品牌色和几个功能色即可。算法会自动生成完整的色板梯度。
+2. **用 `seedToken.light` / `seedToken.dark` 分离模式相关的种子令牌**：`colorBgBase`、`colorTextBase`、`colorLinkBase` 在亮/暗模式下语义相反，放在共享 `seedToken.common` 里会让两个算法拿到错误的基准值。
 3. **语义覆盖只用于精确修正**：如果算法生成的背景色、文本色与设计稿不完全一致，再通过 `semanticToken.light` / `.dark` 精确覆盖。
 4. **不需要覆盖与默认值相同的字段**：`defineTheme` 会自动回落到内置默认值，只写差异部分即可。
 5. **不需要指定 algorithm**：除非有特殊的色板算法需求，内置的 `defaultLightAlgorithm` 和 `defaultDarkAlgorithm` 能满足绝大部分场景。
